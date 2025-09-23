@@ -1,11 +1,10 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type WindowItem = { start: string; end: string };
 
-function isHM(v: string) { return /^\d{2}:\d{2}$/.test(v); }
 function pad(n: number) { return n<10?`0${n}`:`${n}`; }
 function toYMD(d=new Date()) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 

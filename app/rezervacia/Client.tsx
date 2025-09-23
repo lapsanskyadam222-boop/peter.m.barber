@@ -1,199 +1,305 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Turnstile } from "@marsidev/react-turnstile";
+import Turnstile from "react-turnstile";
 
-type Slot = {
-  id: string;
-  date: string;
-  time: string;
-  locked: boolean;
-};
 
 // --- Mode switch + services (Mode 2) ---
 type Service = { id: string; name: string; duration_min: number; active: boolean };
-const [mode, setMode] = useState<1 | 2>(1);
+const [mode, setMode] = useState<1|2>(1);
 const [services, setServices] = useState<Service[]>([]);
-const [serviceId, setServiceId] = useState<string>("");
-
-useMemo(() => {}, [mode]); // keep React happy
+const [serviceId, setServiceId] = useState<string>('');
 
 async function loadMode() {
   try {
-    const r = await fetch("/api/rs-settings");
-    const j = await r.json();
-    if (r.ok && (j.reservationMode === 1 || j.reservationMode === 2))
-      setMode(j.reservationMode);
+    const r = await fetch('/api/rs-settings'); const j = await r.json();
+    if (r.ok && (j.reservationMode===1 || j.reservationMode===2)) setMode(j.reservationMode);
   } catch {}
 }
 async function loadServices() {
   try {
-    const r = await fetch("/api/services");
-    const j = await r.json();
-    if (r.ok) setServices((j.services || []).filter((s: Service) => s.active !== false));
+    const r = await fetch('/api/services'); const j = await r.json();
+    if (r.ok) setServices((j.services||[]).filter((s: Service)=> s.active !== false));
   } catch {}
 }
-useEffect(() => {
-  loadMode();
-  loadServices();
-}, []);
+useEffect(()=>{ loadMode(); loadServices(); }, []);
 
-// compute which times are valid for a selected service in Mode 2
-function toMin(hm: string) {
-  const [h, m] = hm.split(":").map(Number);
-  return h * 60 + m;
-}
+function toMin(hm: string) { const [h,m] = hm.split(':').map(Number); return h*60+m; }
 function validStartsForService(slots: Slot[], durationMin: number) {
-  const byTime = [...slots].sort((a, b) => a.time.localeCompare(b.time));
-  const steps =
-    byTime.length > 1 ? toMin(byTime[1].time) - toMin(byTime[0].time) : 0;
+  const byTime = [...slots].sort((a,b)=> a.time.localeCompare(b.time));
+  const steps = byTime.length>1 ? (toMin(byTime[1].time)-toMin(byTime[0].time)) : 0;
   if (!steps) return byTime;
-  const need = Math.max(1, Math.ceil(durationMin / steps));
+  const need = Math.max(1, Math.ceil(durationMin/steps));
   const out: Slot[] = [];
-  for (let i = 0; i < byTime.length; i++) {
-    const chain = byTime.slice(i, i + need);
-    if (chain.length < need) break;
-    if (chain.some((s) => s.locked)) continue;
+  for (let i=0;i<byTime.length;i++) {
+    const chain = byTime.slice(i,i+need);
+    if (chain.length<need) break;
+    if (chain.some(s=> s.locked)) continue;
     out.push(byTime[i]);
   }
   return out;
 }
 
-export default function Client({
-  slotsFor,
-  selectedDate,
-}: {
-  slotsFor: (date: string) => Slot[];
-  selectedDate: string | null;
-}) {
-  const [selectedTime, setSelectedTime] = useState("");
-  const [name, setName] = useState("");
+
+type Slot = { id: string; date: string; time: string; locked?: boolean; booked?: boolean };
+
+const WD = ["po","ut","st","št","pia","so","ne"];
+const monthLabel = (d: Date) =>
+  d.toLocaleDateString("sk-SK", { month: "long", year: "numeric" });
+
+function pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
+function toISO(d: Date)  { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+function buildCalendar(year: number, month0: number) {
+  const first = new Date(year, month0, 1);
+  const last  = new Date(year, month0 + 1, 0);
+
+  const start = new Date(first);
+  const day = start.getDay(); // 0=ne
+  const diff = (day === 0 ? -6 : 1 - day); // zarovnanie na pondelok
+  start.setDate(start.getDate() + diff);
+  start.setHours(0,0,0,0);
+
+  const cells: { date: Date; inMonth: boolean }[] = [];
+  for (let i=0;i<42;i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    cells.push({ date: d, inMonth: d >= first && d <= last });
+  }
+  return cells;
+}
+
+function fmtLong(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("sk-SK", { day:"numeric", month:"numeric", year:"numeric" });
+}
+
+export default function ClientRezervacia({ slots }: { slots: Slot[] }) {
+  const todayIso = new Date().toISOString().slice(0,10);
+
+  const available = useMemo(
+    () => (slots ?? [])
+      .filter(s => s.date >= todayIso && !s.locked && !s.booked)
+      .sort((a,b)=> (a.date===b.date ? (a.time<b.time?-1:1) : (a.date<b.date?-1:1))),
+    [slots, todayIso]
+  );
+
+  if (!available.length) {
+    return (
+      <main className="mx-auto max-w-xl p-6">
+        <h1 className="mb-4 text-2xl font-bold text-center">Rezervácia</h1>
+        <p className="text-sm opacity-70 text-center">Momentálne nie sú dostupné žiadne termíny. Skúste neskôr.</p>
+      </main>
+    );
+  }
+
+  const firstDate = available[0].date;
+  const [anchor, setAnchor] = useState(() => { const d = new Date(firstDate); d.setDate(1); d.setHours(0,0,0,0); return d; });
+  const [activeDate, setActiveDate] = useState(firstDate);
+
+  const cells = useMemo(() => buildCalendar(anchor.getFullYear(), anchor.getMonth()), [anchor]);
+
+  const availableDates = useMemo(() => new Set(available.map(s => s.date)), [available]);
+  const daySlots = useMemo(() => available.filter(s => s.date === activeDate), [available, activeDate]);
+
+  function prevMonth() { const d = new Date(anchor); d.setMonth(d.getMonth()-1); setAnchor(d); }
+  function nextMonth() { const d = new Date(anchor); d.setMonth(d.getMonth()+1); setAnchor(d); }
+
+  const grid7: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 };
+  const cellH = 56;
+
+  return (
+    <main className="mx-auto max-w-lg p-6">
+      <h1 className="mb-4 text-2xl font-bold">Rezervácia</h1>
+
+      <div className="w-full">
+        {/* Hlavička mesiaca */}
+        <div className="mb-3 flex items-center justify-between">
+          <button onClick={prevMonth} className="rounded border px-3 py-1 hover:bg-gray-50" aria-label="Predchádzajúci mesiac">‹</button>
+          <div className="text-base font-semibold capitalize">{monthLabel(anchor)}</div>
+          <button onClick={nextMonth} className="rounded border px-3 py-1 hover:bg-gray-50" aria-label="Nasledujúci mesiac">›</button>
+        </div>
+
+        {/* Názvy dní */}
+        <div style={grid7} className="text-center text-xs mb-1">
+          {WD.map(w => (
+            <div key={w} className="py-2 font-semibold opacity-70 uppercase">{w}</div>
+          ))}
+        </div>
+
+        {/* Mriežka 7×6 */}
+        <div style={grid7} className="mb-8">
+          {cells.map(({ date, inMonth }, idx) => {
+            const iso = toISO(date);
+            const isAv   = availableDates.has(iso);
+            const isPast = iso < todayIso;
+            const isAct  = iso === activeDate;
+
+            const common = "rounded border flex items-center justify-center select-none";
+            const style: React.CSSProperties = { height: cellH };
+
+            let cls = "";
+            if (!inMonth) cls = "bg-gray-50 text-gray-300";
+            else if (isAct) cls = "bg-black text-white border-black";
+            else if (isAv && !isPast) cls = "bg-white hover:bg-gray-100 cursor-pointer";
+            else cls = "bg-gray-100 text-gray-400";
+
+            return (
+              <button
+                type="button"
+                key={idx}
+                disabled={!inMonth || !isAv || isPast}
+                onClick={()=> setActiveDate(iso)}
+                title={fmtLong(iso)}
+                className={`${common} ${cls}`}
+                style={style}
+              >
+                <span className="text-sm">{date.getDate()}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <ReservationForm date={activeDate} daySlots={daySlots} />
+    </main>
+  );
+}
+
+function ReservationForm({ date, daySlots }: { date: string; daySlots: Slot[] }) {
+  const [slotId, setSlotId] = useState<string>(daySlots[0]?.id ?? "");
+  const [name, setName]   = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [okCaptcha, setOkCaptcha] = useState(false);
 
-  let times = slotsFor(selectedDate);
-  if (mode === 2) {
-    const svc = services.find((s) => s.id === serviceId);
-    if (svc) times = validStartsForService(times, svc.duration_min);
+  // --- ochrany ---
+  const [hp, setHp] = useState("");           // honeypot (skryté pole)
+  const [cfToken, setCfToken] = useState(""); // Turnstile token
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState(false);
+  const ts = useMemo(() => Date.now().toString(), []); // timestamp proti replay
+
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY || "";
+
+  if (daySlots.length && !daySlots.find(s => s.id === slotId)) {
+    setSlotId(daySlots[0].id);
   }
 
   const canSubmit =
-    !!selectedTime &&
-    !!name &&
-    !!email &&
-    !!phone &&
-    okCaptcha &&
-    (mode === 1 || !!serviceId);
+    !!slotId &&
+    name.trim().length >= 2 &&
+    /\S+@\S+\.\S+/.test(email) &&
+    phone.trim().length >= 6 &&
+    !!cfToken &&
+    !busy;
 
-  async function handleSubmit() {
-    const service = services.find((s) => s.id === serviceId);
-    let res;
-    if (mode === 2 && service) {
-      res = await fetch("/api/book-seq", {
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+
+    setBusy(true);
+    setErr("");
+    setOk(false);
+
+    try {
+      const res = await fetch("/api/reservations", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          date: selectedDate,
-          start: selectedTime,
-          duration_min: service.duration_min,
-          name,
-          email,
-          phone,
+          slotId,
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          // ochrany:
+          hp,
+          cfToken,
+          ts,
         }),
       });
-    } else {
-      res = await fetch("/api/reservations", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          date: selectedDate,
-          time: selectedTime,
-          name,
-          email,
-          phone,
-        }),
-      });
-    }
-    const j = await res.json();
-    if (!res.ok) {
-      alert(j.error || "Nepodarilo sa rezervovať.");
-    } else {
-      alert("Rezervácia prebehla úspešne.");
-      window.location.href = "/";
+      const j = await res.json();
+      if (!res.ok || !j?.ok) throw new Error(j?.error || "Odoslanie zlyhalo");
+      setOk(true);
+      setCfToken(""); // vypnut token po úspechu
+      window.location.href = "/rezervacia/ok";
+    } catch (error: any) {
+      setErr(error?.message || "Odoslanie zlyhalo");
+    } finally {
+      setBusy(false);
     }
   }
 
+  function fmt(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleDateString("sk-SK",{day:"numeric",month:"numeric",year:"numeric"});
+  }
+
   return (
-    <div>
-      {mode === 2 && (
-        <div className="mb-3">
-          <label className="block text-sm mb-1">Služba</label>
-          <select
-            value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
-            className="w-full border rounded px-2 py-2"
-          >
-            <option value="">-- vyberte službu --</option>
-            {services.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.duration_min} min)
-              </option>
-            ))}
-          </select>
-        </div>
+    <form onSubmit={submit} className="w-full rounded border p-3 space-y-3">
+      {/* honeypot – skryté, bots to vyplnia */}
+      <input
+        name="website"
+        value={hp}
+        onChange={(e) => setHp(e.target.value)}
+        className="hidden"
+        autoComplete="off"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+
+      <div className="text-xs opacity-70">Dátum: <strong>{fmt(date)}</strong></div>
+
+      <label className="block">
+        <span className="block text-xs mb-1">Čas</span>
+        <select value={slotId} onChange={(e)=> setSlotId(e.target.value)} className="w-full border rounded px-3 py-2">
+          {daySlots.length ? daySlots.map(s => (
+            <option key={s.id} value={s.id}>{s.time}</option>
+          )) : <option value="" disabled>Žiadne časy v tento deň</option>}
+        </select>
+      </label>
+
+      <label className="block">
+        <span className="block text-xs mb-1">Meno</span>
+        <input className="w-full border rounded px-3 py-2" value={name} onChange={e=>setName(e.target.value)} />
+      </label>
+
+      <label className="block">
+        <span className="block text-xs mb-1">E-mail</span>
+        <input type="email" className="w-full border rounded px-3 py-2" value={email} onChange={e=>setEmail(e.target.value)} />
+      </label>
+
+      <label className="block">
+        <span className="block text-xs mb-1">Telefón</span>
+        <input className="w-full border rounded px-3 py-2" value={phone} onChange={e=>setPhone(e.target.value)} />
+      </label>
+
+      {/* Turnstile */}
+      {siteKey ? (
+        <Turnstile
+          sitekey={siteKey}
+          onSuccess={(t) => setCfToken(t)}
+          onExpire={() => setCfToken("")}
+          options={{ action: "reservation" }}
+          className="pt-2"
+        />
+      ) : (
+        <p className="text-xs text-red-600">
+          Chýba NEXT_PUBLIC_TURNSTILE_SITEKEY – overenie nebude fungovať.
+        </p>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
-        {times.map((t) => (
-          <button
-            key={t.id}
-            className={`px-2 py-1 border rounded ${
-              selectedTime === t.time ? "bg-blue-500 text-white" : ""
-            }`}
-            disabled={t.locked}
-            onClick={() => setSelectedTime(t.time)}
-          >
-            {t.time}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-3 space-y-2">
-        <input
-          className="w-full border px-2 py-1 rounded"
-          placeholder="Meno"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          className="w-full border px-2 py-1 rounded"
-          placeholder="E-mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          className="w-full border px-2 py-1 rounded"
-          placeholder="Telefón"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
-      </div>
-
-      <div className="mt-3">
-        <Turnstile
-          siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY!}
-          onSuccess={() => setOkCaptcha(true)}
-        />
-      </div>
-
       <button
-        className="mt-3 px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50"
+        type="submit"
+        className={`w-full rounded py-2 text-white ${canSubmit ? "bg-black" : "bg-black/50 cursor-not-allowed"}`}
         disabled={!canSubmit}
-        onClick={handleSubmit}
       >
-        Rezervovať
+        {busy ? "Odosielam…" : "Vybrať si termín"}
       </button>
-    </div>
+
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      {ok && <p className="text-xs text-green-700">Rezervácia odoslaná.</p>}
+
+      <p className="text-xs opacity-70">* Klikateľné sú len dni, ktoré majú voľné termíny.</p>
+    </form>
   );
 }
