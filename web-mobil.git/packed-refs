@@ -1,0 +1,8 @@
+# pack-refs with: peeled fully-peeled sorted 
+ecd6d4866c0eb58f7595169af10dbb7e70c5ec6f refs/heads/develop
+871dd4526f7a7283493f4e284ae8a41ff219be99 refs/heads/fix/carousel-one-per-view
+e1ff60b7f8179a41862f205c7d39dbed45e1031c refs/heads/main
+be97a6e576511ddbe6993db818212b9d00beedef refs/heads/stable
+e1ff60b7f8179a41862f205c7d39dbed45e1031c refs/tags/stable-before-split
+7814b77bffce6bc7cc3747c300639c4368f76b02 refs/tags/v1.0-stable
+^be97a6e576511ddbe6993db818212b9d00beedef
