@@ -13,10 +13,8 @@ const EMPTY = {
 };
 
 export async function GET() {
-  // Orezanie medzier/nových riadkov z ENV (častý zdroj 400 chýb)
-  const baseUrl = (process.env.NEXT_PUBLIC_CONTENT_JSON_URL || '').trim();
-
-  if (!baseUrl) {
+  const raw = (process.env.NEXT_PUBLIC_CONTENT_JSON_URL || '').trim(); // ✅ orež skryté znaky
+  if (!raw) {
     return NextResponse.json(
       { ...EMPTY, sourceUrlUsed: null, note: 'Missing NEXT_PUBLIC_CONTENT_JSON_URL' },
       { headers: { 'Cache-Control': 'no-store' } }
@@ -24,8 +22,8 @@ export async function GET() {
   }
 
   try {
-    // Cache-buster (mení sa raz za minútu – stačí na CDN)
-    const u = new URL(baseUrl);
+    // cache-buster (minútový), no-store hlavičky
+    const u = new URL(raw);
     u.searchParams.set('v', String(Math.floor(Date.now() / 60000)));
 
     const res = await fetch(u.toString(), {
@@ -35,28 +33,27 @@ export async function GET() {
 
     if (!res.ok) {
       return NextResponse.json(
-        { ...EMPTY, sourceUrlUsed: baseUrl, note: `Upstream ${res.status}` },
+        { ...EMPTY, sourceUrlUsed: raw, note: `Upstream ${res.status}` },
         { headers: { 'Cache-Control': 'no-store' } }
       );
     }
 
-    const json = await res.json();
+    const j = await res.json();
 
     return NextResponse.json(
       {
-        logoUrl: json.logoUrl ?? null,
-        carousel: Array.isArray(json.carousel) ? json.carousel : [],
-        text: json.text ?? '',
-        theme: (json.theme ?? { mode: 'light' }) as Theme,
-        updatedAt: json.updatedAt ?? '',
-        // debug info – nechaj kľudne pár dní, potom môžeš odstrániť
-        sourceUrlUsed: baseUrl,
+        logoUrl: j.logoUrl ?? null,
+        carousel: Array.isArray(j.carousel) ? j.carousel : [],
+        text: j.text ?? '',
+        theme: (j.theme ?? { mode: 'light' }) as Theme,
+        updatedAt: j.updatedAt ?? '',
+        sourceUrlUsed: raw, // pomocná info; môžeš odstrániť
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch {
     return NextResponse.json(
-      { ...EMPTY, sourceUrlUsed: baseUrl, note: 'Fetch error' },
+      { ...EMPTY, sourceUrlUsed: raw, note: 'Fetch error' },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   }
