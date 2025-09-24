@@ -22,13 +22,17 @@ async function getContent(): Promise<{
     const url = `${base}/api/content`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return { ok: false, status: res.status, error: `Fetch ${url} failed with ${res.status}` };
-    const json = (await res.json()) as SiteContent & { theme?: Theme; updatedAt?: string };
-    return { ok: true, data: json };
+
+    const raw = await res.json();
+
+    // 👇 ak API vracia { ok, data }, zober data; inak zober celé telo
+    const json = (raw && typeof raw === 'object' && 'data' in raw) ? raw.data : raw;
+
+    return { ok: true, data: json as SiteContent & { theme?: Theme; updatedAt?: string } };
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Unknown fetch error' };
   }
 }
-
 export default async function HomePage() {
   const result = await getContent();
 
