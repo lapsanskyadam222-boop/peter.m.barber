@@ -1,45 +1,7 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import Turnstile from "react-turnstile";
-
-
-// --- Mode switch + services (Mode 2) ---
-type Service = { id: string; name: string; duration_min: number; active: boolean };
-const [mode, setMode] = useState<1|2>(1);
-const [services, setServices] = useState<Service[]>([]);
-const [serviceId, setServiceId] = useState<string>('');
-
-async function loadMode() {
-  try {
-    const r = await fetch('/api/rs-settings'); const j = await r.json();
-    if (r.ok && (j.reservationMode===1 || j.reservationMode===2)) setMode(j.reservationMode);
-  } catch {}
-}
-async function loadServices() {
-  try {
-    const r = await fetch('/api/services'); const j = await r.json();
-    if (r.ok) setServices((j.services||[]).filter((s: Service)=> s.active !== false));
-  } catch {}
-}
-useEffect(()=>{ loadMode(); loadServices(); }, []);
-
-function toMin(hm: string) { const [h,m] = hm.split(':').map(Number); return h*60+m; }
-function validStartsForService(slots: Slot[], durationMin: number) {
-  const byTime = [...slots].sort((a,b)=> a.time.localeCompare(b.time));
-  const steps = byTime.length>1 ? (toMin(byTime[1].time)-toMin(byTime[0].time)) : 0;
-  if (!steps) return byTime;
-  const need = Math.max(1, Math.ceil(durationMin/steps));
-  const out: Slot[] = [];
-  for (let i=0;i<byTime.length;i++) {
-    const chain = byTime.slice(i,i+need);
-    if (chain.length<need) break;
-    if (chain.some(s=> s.locked)) continue;
-    out.push(byTime[i]);
-  }
-  return out;
-}
-
 
 type Slot = { id: string; date: string; time: string; locked?: boolean; booked?: boolean };
 
