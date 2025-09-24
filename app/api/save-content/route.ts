@@ -43,7 +43,6 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    // prepíšeme ten istý kľúč: žiadne verzovanie = žiadne listovanie
     const key = 'site-content.json';
 
     const res = await put(key, JSON.stringify(payload, null, 2), {

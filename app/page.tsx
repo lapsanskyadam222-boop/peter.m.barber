@@ -63,10 +63,9 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Tu globálne nastavíme CSS premenné pre celú stránku (html/body). */}
+      {/* Globálne CSS premenné */}
       <style>{`:root{--page-bg:${bg};--page-fg:${fg};}`}</style>
 
-      {/* Obsah – layout sa postará o rámik/centrovanie, farby už prídu z body */}
       <main className="min-h-dvh antialiased">
         <section className="flex flex-col items-center gap-4">
           {/* LOGO */}
@@ -89,7 +88,7 @@ export default async function HomePage() {
             </div>
           )}
 
-          {/* TEXT – zachová odseky, ak vkladáš plain text */}
+          {/* TEXT */}
           {text ? (
             <article
               className="prose text-center"
