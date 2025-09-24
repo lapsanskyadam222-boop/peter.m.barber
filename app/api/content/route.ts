@@ -1,60 +1,84 @@
 // app/api/content/route.ts
 import { NextResponse } from 'next/server';
 
-export const revalidate = 0;
+export const runtime = 'edge';
 
-type Theme = { mode: 'light' | 'dark' | 'custom'; bgColor?: string; textColor?: string };
-const EMPTY = {
-  logoUrl: null as string | null,
-  carousel: [] as string[],
-  text: '',
-  theme: { mode: 'light' as const } as Theme,
-  updatedAt: '',
+type Theme =
+  | { mode: 'light' }
+  | { mode: 'dark' }
+  | { mode: 'custom'; bgColor: string; textColor: string };
+
+type SiteContent = {
+  logoUrl: string | null;
+  carousel: string[];
+  text: string;
+  theme?: Theme;
+  updatedAt?: string;
 };
 
 export async function GET() {
-  const raw = (process.env.NEXT_PUBLIC_CONTENT_JSON_URL || '').trim(); // ✅ orež skryté znaky
-  if (!raw) {
+  // 1) ENV + tvrdý TRIM (odstráni aj \r, \n a nevytlačiteľné znaky)
+  const rawEnv = process.env.NEXT_PUBLIC_CONTENT_JSON_URL ?? '';
+  const source = rawEnv.replace(/[\s\r\n]+$/g, '').replace(/^\s+/g, '');
+
+  // 2) Cache-buster + no-store (aby si nikdy nevidel starý JSON)
+  const url = source ? `${source}${source.includes('?') ? '&' : '?'}_=${Date.now()}` : '';
+
+  if (!source) {
     return NextResponse.json(
-      { ...EMPTY, sourceUrlUsed: null, note: 'Missing NEXT_PUBLIC_CONTENT_JSON_URL' },
-      { headers: { 'Cache-Control': 'no-store' } }
+      {
+        ok: false,
+        error: 'NEXT_PUBLIC_CONTENT_JSON_URL is empty',
+        rawEnv,
+        sourceUrlUsed: source,
+      },
+      { status: 500 }
     );
   }
 
   try {
-    // cache-buster (minútový), no-store hlavičky
-    const u = new URL(raw);
-    u.searchParams.set('v', String(Math.floor(Date.now() / 60000)));
+    const res = await fetch(url, { cache: 'no-store' });
 
-    const res = await fetch(u.toString(), {
-      cache: 'no-store',
-      headers: { pragma: 'no-cache', 'cache-control': 'no-cache' },
-    });
-
+    // 3) Keď padne upstream, pošleme späť maximum informácií
     if (!res.ok) {
+      const text = await res.text().catch(() => '');
       return NextResponse.json(
-        { ...EMPTY, sourceUrlUsed: raw, note: `Upstream ${res.status}` },
-        { headers: { 'Cache-Control': 'no-store' } }
+        {
+          ok: false,
+          error: 'Upstream fetch failed',
+          status: res.status,
+          statusText: res.statusText,
+          sourceUrlUsed: source,
+          fetchedUrl: url,
+          upstreamBodySample: text.slice(0, 200),
+        },
+        { status: 502 }
       );
     }
 
-    const j = await res.json();
-
+    const data = (await res.json()) as SiteContent;
+    // 4) Minimálne defaulty, nech sa to v UI nevybúra
+    return NextResponse.json({
+      ok: true,
+      sourceUrlUsed: source,
+      fetchedUrl: url,
+      data: {
+        logoUrl: data.logoUrl ?? null,
+        carousel: Array.isArray(data.carousel) ? data.carousel : [],
+        text: data.text ?? '',
+        theme: data.theme ?? { mode: 'light' as const },
+        updatedAt: data.updatedAt ?? '',
+      },
+    });
+  } catch (e: any) {
     return NextResponse.json(
       {
-        logoUrl: j.logoUrl ?? null,
-        carousel: Array.isArray(j.carousel) ? j.carousel : [],
-        text: j.text ?? '',
-        theme: (j.theme ?? { mode: 'light' }) as Theme,
-        updatedAt: j.updatedAt ?? '',
-        sourceUrlUsed: raw, // pomocná info; môžeš odstrániť
+        ok: false,
+        error: e?.message || 'Unknown fetch error',
+        sourceUrlUsed: source,
+        fetchedUrl: url,
       },
-      { headers: { 'Cache-Control': 'no-store' } }
-    );
-  } catch {
-    return NextResponse.json(
-      { ...EMPTY, sourceUrlUsed: raw, note: 'Fetch error' },
-      { headers: { 'Cache-Control': 'no-store' } }
+      { status: 500 }
     );
   }
 }

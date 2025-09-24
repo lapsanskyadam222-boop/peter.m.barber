@@ -35,11 +35,11 @@ export async function POST(req: Request) {
     // voliteľne doplníme updatedAt
     const withStamp = { ...payload, updatedAt: new Date().toISOString() };
 
-    const blob = await put(key, JSON.stringify(withStamp, null, 2), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false, // ✅ stabilná URL
-    });
+    const blob = await put('site-content.json', JSON.stringify(withStamp, null, 2), {
+  access: 'public',
+  contentType: 'application/json',
+  addRandomSuffix: false,   // ← DÔLEŽITÉ
+});
 
     return NextResponse.json({ ok: true, url: blob.url, key });
   } catch (e: any) {
