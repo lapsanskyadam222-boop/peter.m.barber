@@ -43,15 +43,22 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
+    // prepíšeme stále ten istý kľúč – žiadne listovanie
     const key = 'site-content.json';
 
     const res = await put(key, JSON.stringify(payload, null, 2), {
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
+      // ak je podporované SDK, zakáže cache; ak nie, nevadí – rieši to cache-buster v GET
+      // @ts-ignore
+      cacheControlMaxAge: 0,
     });
 
-    return NextResponse.json({ ok: true, url: res.url, key }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json(
+      { ok: true, url: res.url, key },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch {
     return NextResponse.json({ error: 'Ukladanie zlyhalo' }, { status: 500 });
   }

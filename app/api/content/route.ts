@@ -11,14 +11,34 @@ const EMPTY = {
 };
 
 export async function GET() {
-  const url = process.env.NEXT_PUBLIC_CONTENT_JSON_URL;
-  if (!url) {
-    return NextResponse.json(EMPTY, { headers: { 'Cache-Control': 'no-store' } });
+  const baseUrl = process.env.NEXT_PUBLIC_CONTENT_JSON_URL || '';
+
+  if (!baseUrl) {
+    return NextResponse.json(
+      { ...EMPTY, sourceUrlUsed: null, note: 'Missing NEXT_PUBLIC_CONTENT_JSON_URL' },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 
   try {
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return NextResponse.json(EMPTY, { headers: { 'Cache-Control': 'no-store' } });
+    // cache-buster: mení sa raz za minútu -> vyhneme sa CDN cache starého JSONu
+    const u = new URL(baseUrl);
+    u.searchParams.set('v', String(Math.floor(Date.now() / 60000)));
+
+    const res = await fetch(u.toString(), {
+      cache: 'no-store',
+      headers: {
+        'pragma': 'no-cache',
+        'cache-control': 'no-cache',
+      },
+    });
+
+    if (!res.ok) {
+      return NextResponse.json(
+        { ...EMPTY, sourceUrlUsed: baseUrl, note: `Upstream ${res.status}` },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
 
     const json = await res.json();
 
@@ -29,10 +49,15 @@ export async function GET() {
         text: json.text ?? '',
         theme: json.theme ?? { mode: 'light' },
         updatedAt: json.updatedAt ?? '',
+        // DEBUG info – pomáha overiť, z akej URL čítame (odstráň po doladení)
+        sourceUrlUsed: baseUrl,
       },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch {
-    return NextResponse.json(EMPTY, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json(
+      { ...EMPTY, sourceUrlUsed: baseUrl, note: 'Fetch error' },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 }
