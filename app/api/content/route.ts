@@ -1,5 +1,5 @@
-// app/api/content/route.ts
 import { NextResponse } from 'next/server';
+import { list } from '@vercel/blob';
 
 export const runtime = 'edge';
 
@@ -17,29 +17,21 @@ type SiteContent = {
 };
 
 export async function GET() {
-  // 1) ENV + tvrdý TRIM (odstráni aj \r, \n a nevytlačiteľné znaky)
-  const rawEnv = process.env.NEXT_PUBLIC_CONTENT_JSON_URL ?? '';
-  const source = rawEnv.replace(/[\s\r\n]+$/g, '').replace(/^\s+/g, '');
-
-  // 2) Cache-buster + no-store (aby si nikdy nevidel starý JSON)
-  const url = source ? `${source}${source.includes('?') ? '&' : '?'}_=${Date.now()}` : '';
-
-  if (!source) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: 'NEXT_PUBLIC_CONTENT_JSON_URL is empty',
-        rawEnv,
-        sourceUrlUsed: source,
-      },
-      { status: 500 }
-    );
-  }
-
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    // 1) Nájdeme presne "site-content.json" v tomto projekte (žiadne ENV)
+    const { blobs } = await list({ prefix: 'site-content.json' });
+    const file = blobs.find((b) => b.pathname === 'site-content.json');
 
-    // 3) Keď padne upstream, pošleme späť maximum informácií
+    if (!file) {
+      return NextResponse.json(
+        { ok: false, error: 'site-content.json not found in project blob store' },
+        { status: 404 }
+      );
+    }
+
+    // 2) Stiahneme obsah zo "svojej" URL (pridáme cache-buster)
+    const url = `${file.url}${file.url.includes('?') ? '&' : '?'}_=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       return NextResponse.json(
@@ -48,7 +40,7 @@ export async function GET() {
           error: 'Upstream fetch failed',
           status: res.status,
           statusText: res.statusText,
-          sourceUrlUsed: source,
+          sourceUrlUsed: file.url,
           fetchedUrl: url,
           upstreamBodySample: text.slice(0, 200),
         },
@@ -57,10 +49,10 @@ export async function GET() {
     }
 
     const data = (await res.json()) as SiteContent;
-    // 4) Minimálne defaulty, nech sa to v UI nevybúra
+
     return NextResponse.json({
       ok: true,
-      sourceUrlUsed: source,
+      sourceUrlUsed: file.url,
       fetchedUrl: url,
       data: {
         logoUrl: data.logoUrl ?? null,
@@ -72,12 +64,7 @@ export async function GET() {
     });
   } catch (e: any) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: e?.message || 'Unknown fetch error',
-        sourceUrlUsed: source,
-        fetchedUrl: url,
-      },
+      { ok: false, error: e?.message || 'Unknown error' },
       { status: 500 }
     );
   }
