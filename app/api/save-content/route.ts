@@ -16,12 +16,16 @@ export async function POST(req: Request) {
       addRandomSuffix: false,
     });
 
+    // !!! Dôležité: vrátime URL do response
     return NextResponse.json({
       ok: true,
-      url: blob.url, // ← toto je presný public URL ktorý potrebuješ
+      url: blob.url,
       key: key,
     });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? 'save failed' }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? 'save failed' },
+      { status: 500 }
+    );
   }
 }
