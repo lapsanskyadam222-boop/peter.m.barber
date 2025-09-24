@@ -80,14 +80,22 @@ export async function POST(req: Request) {
 
     // funkcia vracia riadok s názvami v_date, v_time:
     const resv = Array.isArray(data) ? data[0] : data;
-    const dateStr = String(resv.v_date); // "YYYY-MM-DD"
-    const timeStr = String(resv.v_time); // "HH:MM"
+    const rawDate = String(resv.v_date); // "YYYY-MM-DD"
+    const rawTime = String(resv.v_time); // "HH:MM"
+
+    // bezpečné formátovanie na pekný tvar
+    const [year, month, day] = rawDate.split('-').map(Number);
+    const [hour, minute] = rawTime.split(':').map(Number);
+    const start = new Date(year, month - 1, day, hour, minute);
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const dateStr = `${pad(start.getDate())}.${pad(start.getMonth() + 1)}.${start.getFullYear()}`;
+    const timeStr = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
 
     // ICS
     const ics = buildICS({
       title: `Rezervácia: ${name} (${phone})`,
-      date: dateStr,
-      time: timeStr,
+      date: rawDate,
+      time: rawTime,
       durationMinutes: 60,
       timezone: 'Europe/Bratislava',
       location: 'Lezenie s Nicol',
