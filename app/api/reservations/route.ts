@@ -23,7 +23,7 @@ async function verifyTurnstile(token: string, remoteIp?: string) {
   return { ok: !!json.success, reason: json['error-codes']?.join(',') || '' };
 }
 
-// ---- robustné formátovanie dátumu/času ----
+/* ---------- bezpečné formátovanie dátumu/času ---------- */
 const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
 function formatDateSafe(raw: unknown): { pretty: string; ymd?: string } {
@@ -41,7 +41,7 @@ function formatDateSafe(raw: unknown): { pretty: string; ymd?: string } {
     return { pretty: `${pad(d)}.${pad(m)}.${y}`, ymd: `${y}-${pad(m)}-${pad(d)}` };
   }
 
-  // čísla v poliach (fallback)
+  // 2025/9/24 alebo 2025.9.24 a pod.
   const m = s.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/);
   if (m) {
     const y = parseInt(m[1], 10);
@@ -50,7 +50,6 @@ function formatDateSafe(raw: unknown): { pretty: string; ymd?: string } {
     return { pretty: `${pad(d)}.${pad(mo)}.${y}`, ymd: `${y}-${pad(mo)}-${pad(d)}` };
   }
 
-  // keď nevieme – pošleme aspoň surový text
   return { pretty: s || '—' };
 }
 
@@ -65,23 +64,31 @@ function formatTimeSafe(raw: unknown): { pretty: string; hm?: string } {
     return { pretty: `${pad(h)}:${pad(mi)}`, hm: `${pad(h)}:${pad(mi)}` };
   }
 
-  // ak nevieme, vrátime surový text
   return { pretty: s || '—' };
 }
-// --------------------------------------------
+/* -------------------------------------------------------- */
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { slotId, name, email, phone, hp, cfToken, ts } = body as {
+
+    // token skúsime z viacerých názvov + aj z hlavičky
+    const { slotId, name, email, phone, hp, ts } = body as {
       slotId?: string;
       name?: string;
       email?: string;
       phone?: string;
       hp?: string;
-      cfToken?: string;
       ts?: string;
     };
+
+    const cfToken =
+      (body?.cfToken ??
+        body?.token ??
+        body?.turnstileToken ??
+        body?.cf_token ??
+        req.headers.get('cf-turnstile-token') ??
+        '') + '';
 
     // Základná validácia
     if (!slotId || !name || !email || !phone) {
@@ -104,12 +111,14 @@ export async function POST(req: Request) {
     }
 
     // Turnstile – povinné a musí prejsť
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
     if (!cfToken) {
+      console.warn('[TURNSTILE] Missing token in body/header');
       return NextResponse.json({ error: 'Chýbajúce overenie (Turnstile).' }, { status: 400 });
     }
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
     const verify = await verifyTurnstile(cfToken, ip);
     if (!verify.ok) {
+      console.warn('[TURNSTILE] verify failed');
       return NextResponse.json({ error: 'Neúspešné overenie (Turnstile).' }, { status: 400 });
     }
 
@@ -130,22 +139,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Rezervácia zlyhala.' }, { status: 500 });
     }
 
-    // Výstup z RPC – pokúsime sa nájsť dátum/čas v rozličných poliach
+    // Výstup z RPC – dátum/čas môžu mať rôzne polia podľa schémy
     const resv = Array.isArray(data) ? data[0] : data;
 
     const rawDate =
-      resv?.v_date ?? resv?.date ?? resv?.day ?? resv?.d ?? ''; // podľa verzie schémy
+      resv?.v_date ?? resv?.date ?? resv?.day ?? resv?.d ?? '';
     const rawTime =
       resv?.v_time ?? resv?.time ?? resv?.start_time ?? resv?.t ?? '';
 
     const fDate = formatDateSafe(rawDate);
     const fTime = formatTimeSafe(rawTime);
 
-    const dateStr = fDate.pretty; // vždy zmysluplný string (nie NaN)
+    const dateStr = fDate.pretty; // nikdy nie NaN
     const timeStr = fTime.pretty;
 
-    // Podmienené ICS – pošleme len vtedy, keď vieme dať 100% validné hodnoty
-    let icsAttachment: { filename: string; content: string } | null = null;
+    // Podmienené ICS – len pri 100% validných hodnotách
+    let icsAttachment: { filename: string; content: string } | undefined;
     if (fDate.ymd && fTime.hm) {
       const ics = buildICS({
         title: `Rezervácia: ${name} (${phone})`,
@@ -164,7 +173,7 @@ export async function POST(req: Request) {
       icsAttachment = { filename: 'rezervacia.ics', content: ics };
     }
 
-    // Email – predmet aj telo vždy obsahujú termín (žiadne NaN)
+    // Email
     await sendReservationEmail?.(
       `Nová rezervácia ${dateStr} ${timeStr} — ${name}`,
       `<p><strong>Nová rezervácia</strong></p>
@@ -174,7 +183,7 @@ export async function POST(req: Request) {
          <li><b>E-mail:</b> ${email}</li>
          <li><b>Telefón:</b> ${phone}</li>
        </ul>`,
-      icsAttachment || undefined
+      icsAttachment
     );
 
     return NextResponse.json(
