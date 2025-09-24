@@ -1,17 +1,20 @@
+// app/api/content/route.ts
 import { NextResponse } from 'next/server';
 
 export const revalidate = 0;
 
+type Theme = { mode: 'light' | 'dark' | 'custom'; bgColor?: string; textColor?: string };
 const EMPTY = {
   logoUrl: null as string | null,
   carousel: [] as string[],
   text: '',
-  theme: { mode: 'light' as const },
+  theme: { mode: 'light' as const } as Theme,
   updatedAt: '',
 };
 
 export async function GET() {
-  const baseUrl = process.env.NEXT_PUBLIC_CONTENT_JSON_URL || '';
+  // Orezanie medzier/nových riadkov z ENV (častý zdroj 400 chýb)
+  const baseUrl = (process.env.NEXT_PUBLIC_CONTENT_JSON_URL || '').trim();
 
   if (!baseUrl) {
     return NextResponse.json(
@@ -21,16 +24,13 @@ export async function GET() {
   }
 
   try {
-    // cache-buster: mení sa raz za minútu -> vyhneme sa CDN cache starého JSONu
+    // Cache-buster (mení sa raz za minútu – stačí na CDN)
     const u = new URL(baseUrl);
     u.searchParams.set('v', String(Math.floor(Date.now() / 60000)));
 
     const res = await fetch(u.toString(), {
       cache: 'no-store',
-      headers: {
-        'pragma': 'no-cache',
-        'cache-control': 'no-cache',
-      },
+      headers: { pragma: 'no-cache', 'cache-control': 'no-cache' },
     });
 
     if (!res.ok) {
@@ -47,12 +47,12 @@ export async function GET() {
         logoUrl: json.logoUrl ?? null,
         carousel: Array.isArray(json.carousel) ? json.carousel : [],
         text: json.text ?? '',
-        theme: json.theme ?? { mode: 'light' },
+        theme: (json.theme ?? { mode: 'light' }) as Theme,
         updatedAt: json.updatedAt ?? '',
-        // DEBUG info – pomáha overiť, z akej URL čítame (odstráň po doladení)
+        // debug info – nechaj kľudne pár dní, potom môžeš odstrániť
         sourceUrlUsed: baseUrl,
       },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch {
     return NextResponse.json(
