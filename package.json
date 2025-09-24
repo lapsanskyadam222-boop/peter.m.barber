@@ -28,7 +28,7 @@
     "@types/node": "^20.12.12",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
-    "dotenv": "^17.2.1",
+    "dotenv": "^17.2.2",
     "tsx": "^4.20.5",
     "typescript": "^5.5.4"
   }

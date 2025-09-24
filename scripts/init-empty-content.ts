@@ -1,33 +1,34 @@
 // scripts/init-empty-content.ts
 import { config } from 'dotenv';
-config({ path: '.env.local' }); // načíta lokálne env premenné
+config({ path: '.env.local' });
 
 import { put } from '@vercel/blob';
 
 async function run() {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
-    throw new Error('Chýba BLOB_READ_WRITE_TOKEN v env (.env.local alebo Vercel ENV).');
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error('Chýba BLOB_READ_WRITE_TOKEN v .env.local / Vercel ENV');
   }
 
-  // voliteľne: overíme, že bežíme s RW tokenom (len info)
-  console.log('Using BLOB_READ_WRITE_TOKEN (prefix):', token.slice(0, 18) + '…');
-
+  // počiatočný obsah webu
   const payload = {
-    logoUrl: null,
-    carousel: [],
+    logoUrl: null as string | null,
+    carousel: [] as string[],
     text: '',
+    theme: { mode: 'light' as const },
     updatedAt: new Date().toISOString(),
   };
 
-  const pathname = `site-content-${Date.now()}.json`;
+  // DÔLEŽITÉ: fixný kľúč bez náhodného suffixu
+  const key = 'site-content.json';
 
-  const res = await put(pathname, JSON.stringify(payload, null, 2), {
+  const res = await put(key, JSON.stringify(payload, null, 2), {
     access: 'public',
     contentType: 'application/json',
+    addRandomSuffix: false,
   });
 
-  console.log('Init content created at:', res.url);
+  console.log('✅ Content JSON created at:', res.url);
+  console.log('➡️  Skopíruj túto URL do NEXT_PUBLIC_CONTENT_JSON_URL v .env.local a vo Vercel ENV');
 }
 
 run().catch((e) => {
