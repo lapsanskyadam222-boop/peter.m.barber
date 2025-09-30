@@ -1,201 +1,129 @@
-'use client';
+"use client";
 
-import * as React from 'react';
+import Image from "next/image";
+import { useState, useRef, useEffect, TouchEvent, MouseEvent } from "react";
+
+type ImgObj = { src: string; alt?: string };
 
 type CarouselProps = {
-  images: string[];
-  /** Pomer strán – napr. "4/5", "1/1", "16/9". */
+  images: Array<string | ImgObj>;
   aspect?: string;
-  /** Jemný rádius rohov v px (default 6). */
-  edgeRadius?: number;
-  /** Max. šírka na desktope (px) — desktop bude vždy centrovaný. */
+  frameAspect?: string;
+  fit?: "cover" | "contain";
+  radius?: number;
   desktopMaxWidth?: number;
-  /** Mobilný vnútorný “gutter” v px (default 8). */
-  mobilePadding?: number;
   className?: string;
 };
 
-function aspectToPaddingPercent(aspect?: string) {
-  const raw = (aspect ?? '4/5').replace(/\s/g, '');
-  const [w, h] = raw.split('/').map(Number);
-  if (!w || !h) return 125; // fallback = 4/5
-  return (h / w) * 100;
+function normalizeImages(arr: Array<string | ImgObj>): ImgObj[] {
+  return arr.map((it) =>
+    typeof it === "string" ? { src: it, alt: "" } : { src: it.src, alt: it.alt || "" }
+  );
 }
 
 export default function Carousel({
   images,
-  aspect = '4/5',
-  edgeRadius = 6,
-  desktopMaxWidth = 720,
-  mobilePadding = 8,
-  className = '',
+  aspect,
+  frameAspect = "4/5",
+  fit = "cover",
+  radius = 5,                // ⬅️ default 5px (jemné zaoblenie)
+  desktopMaxWidth = 900,
+  className,
 }: CarouselProps) {
-  const total = Array.isArray(images) ? images.length : 0;
-  const [index, setIndex] = React.useState(0);
-  const [dragX, setDragX] = React.useState(0);
-  const [dragging, setDragging] = React.useState(false);
+  const items = normalizeImages(images);
+  const [index, setIndex] = useState(0);
+  const startX = useRef<number | null>(null);
+  const isDragging = useRef(false);
+  const trackRef = useRef<HTMLDivElement>(null);
 
-  const startX = React.useRef(0);
-  const startT = React.useRef(0);
-  const wrapRef = React.useRef<HTMLDivElement | null>(null);
-  const widthRef = React.useRef(1);
+  const resolvedAspect = aspect || frameAspect;
 
-  React.useEffect(() => {
-    const el = wrapRef.current;
+  const handleStart = (clientX: number) => {
+    startX.current = clientX;
+    isDragging.current = true;
+  };
+
+  const handleMove = (clientX: number) => {
+    if (!isDragging.current || startX.current === null) return;
+    const diff = clientX - startX.current;
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) prev();
+      else next();
+      isDragging.current = false;
+    }
+  };
+
+  const handleEnd = () => {
+    isDragging.current = false;
+    startX.current = null;
+  };
+
+  const prev = () => setIndex((i) => (i > 0 ? i - 1 : items.length - 1));
+  const next = () => setIndex((i) => (i + 1) % items.length);
+
+  useEffect(() => {
+    const el = trackRef.current;
     if (!el) return;
-    const measure = () => (widthRef.current = Math.max(1, el.clientWidth || 1));
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const onDown = (e: MouseEvent) => handleStart((e as any).clientX);
+    const onMove = (e: MouseEvent) => handleMove((e as any).clientX);
+    const onUp = () => handleEnd();
+
+    el.addEventListener("mousedown", onDown as any);
+    el.addEventListener("mousemove", onMove as any);
+    el.addEventListener("mouseup", onUp as any);
+    el.addEventListener("mouseleave", onUp as any);
+
+    return () => {
+      el.removeEventListener("mousedown", onDown as any);
+      el.removeEventListener("mousemove", onMove as any);
+      el.removeEventListener("mouseup", onUp as any);
+      el.removeEventListener("mouseleave", onUp as any);
+    };
   }, []);
 
-  // Preload susedných snímok pre rýchlejšie prepnutie
-  React.useEffect(() => {
-    if (!total) return;
-    const preload = (i: number) => {
-      if (i < 0 || i >= total) return;
-      const src = images[i];
-      if (!src) return;
-      const img = new Image();
-      img.decoding = 'async';
-      img.src = src;
-    };
-    preload(index + 1);
-    preload(index - 1);
-  }, [index, images, total]);
-
-  const begin = (e: React.PointerEvent) => {
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    startX.current = e.clientX;
-    startT.current = performance.now();
-    setDragging(true);
-    setDragX(0);
-  };
-
-  const move = (e: React.PointerEvent) => {
-    if (!dragging) return;
-    const dx = e.clientX - startX.current;
-    if (Math.abs(dx) < 4) return; // citlivejší prah na zachytenie horizontálneho pohybu
-    e.preventDefault();
-    setDragX(dx);
-  };
-
-  const end = () => {
-    if (!dragging) return;
-    const delta = dragX / Math.max(1, widthRef.current);
-    let next = index;
-
-    // znížený prah na prelistovanie
-    const THRESH = 0.12;
-
-    // jednoduchý „flick“: ak gesto bolo rýchle, povoľ menší posun
-    const dt = Math.max(1, performance.now() - startT.current); // ms
-    const speedPxPerMs = Math.abs(dragX) / dt;
-    const fast = speedPxPerMs > 0.5;
-
-    if ((delta <= -THRESH || (dragX < 0 && fast)) && index < total - 1) next = index + 1;
-    if ((delta >=  THRESH || (dragX > 0 && fast)) && index > 0)        next = index - 1;
-
-    setIndex(next);
-    setDragX(0);
-    setDragging(false);
-  };
-
-  if (!total) return null;
-
-  const tx = -(index * 100) + (dragX / Math.max(1, widthRef.current)) * 100;
-  const padTop = aspectToPaddingPercent(aspect);
-
   return (
-    <section className={className}>
-      {/* OUTER: desktop = centrovaný s maxWidth; mobile = full-bleed cez media query */}
+    <section
+      className={className}
+      style={{ maxWidth: `${desktopMaxWidth}px`, margin: "0 auto" }}
+    >
       <div
-        className="carousel-outer"
-        style={{ ['--maxw' as any]: `${desktopMaxWidth}px`, ['--mpad' as any]: `${mobilePadding}px` }}
+        ref={trackRef}
+        style={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: resolvedAspect,
+          borderRadius: radius,
+          overflow: "hidden",
+          touchAction: "pan-y",
+          cursor: "grab",
+        }}
+        onTouchStart={(e: TouchEvent) => handleStart(e.touches[0].clientX)}
+        onTouchMove={(e: TouchEvent) => handleMove(e.touches[0].clientX)}
+        onTouchEnd={handleEnd}
+        onDragStart={(e) => e.preventDefault()}
       >
-        {/* VIEWPORT */}
         <div
-          ref={wrapRef}
-          className="carousel-viewport"
-          style={{ borderRadius: `${edgeRadius}px` }}
+          style={{
+            display: "flex",
+            height: "100%",
+            transform: `translateX(-${index * 100}%)`,
+            transition: "transform 0.4s ease",
+          }}
         >
-          {/* TRACK */}
-          <div
-            className="carousel-track"
-            style={{ transform: `translate3d(${tx}%,0,0)`, transition: dragging ? 'none' : 'transform 300ms ease' }}
-            onPointerDown={begin}
-            onPointerMove={move}
-            onPointerUp={end}
-            onPointerCancel={end}
-            onPointerLeave={end}
-            aria-label="carousel-track"
-          >
-            {images.map((src, i) => (
-              <div key={i} className="slide">
-                <div className="ratio" style={{ paddingTop: `${padTop}%` }} aria-hidden="true" />
-                <div className="imgwrap">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt={`slide-${i + 1}`}
-                    draggable={false}
-                    loading={i === 0 ? 'eager' : 'lazy'}
-                    // pomôcky pre rýchlejšie zobrazenie
-                    decoding="async"
-                    // @ts-expect-error modern browsers support this attribute
-                    fetchpriority={i === 0 ? 'high' : 'auto'}
-                    sizes="(max-width: 1023px) 100vw, 720px"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          {items.map((img, i) => (
+            <div key={i} style={{ minWidth: "100%", height: "100%", position: "relative" }}>
+              <Image
+                src={img.src}
+                alt={img.alt || ""}
+                fill
+                sizes="(max-width: 900px) 100vw, 900px"
+                style={{ objectFit: fit, userSelect: "none", pointerEvents: "none" }}
+                draggable={false}
+              />
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* styled-jsx: čisto CSS break-point, žiadna JS logika */}
-      <style jsx>{`
-        .carousel-outer {
-          width: 100%;
-          max-width: var(--maxw);
-          margin: 0 auto; /* desktop centrovaný */
-        }
-        .carousel-viewport {
-          position: relative;
-          width: 100%;
-          overflow: hidden;
-          background: rgba(0,0,0,0.05);
-        }
-        .carousel-track {
-          display: flex;
-          touch-action: pan-y;
-          user-select: none;
-          will-change: transform;
-          cursor: grab;
-        }
-        .carousel-track:active { cursor: grabbing; }
-        .slide {
-          position: relative;
-          flex: 0 0 100%;
-          overflow: hidden;
-        }
-        .ratio { width: 100%; }
-        .imgwrap { position: absolute; inset: 0; }
-        .imgwrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-        /* MOBILE (<=1023px): full-bleed + úzky vnútorný gutter */
-        @media (max-width: 1023px) {
-          .carousel-outer {
-            width: 100vw;
-            max-width: none;
-            margin-left: calc(50% - 50vw);
-            margin-right: calc(50% - 50vw);
-            padding-left: var(--mpad);
-            padding-right: var(--mpad);
-          }
-        }
-      `}</style>
     </section>
   );
 }
