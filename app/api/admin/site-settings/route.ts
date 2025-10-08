@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
 
-// Doplnené: vynútime Node.js runtime a žiadne kešovanie
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +17,12 @@ export async function GET() {
       .single();
 
     if (error) {
-      console.error('[site-settings][GET] supabase error:', error);
+      console.error('[site-settings][GET]', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error('[site-settings][GET] fatal:', e);
+    console.error('[site-settings][GET] fatal', e);
     return NextResponse.json({ error: e?.message ?? 'Server error' }, { status: 500 });
   }
 }
@@ -32,12 +31,10 @@ export async function POST(request: Request) {
   try {
     const auth = request.headers.get('x-admin-password') ?? '';
     if (auth !== ADMIN_PASSWORD) {
-      console.warn('[site-settings][POST] unauthorized');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { phone, email, instagram_url, facebook_url } = body;
+    const { phone, email, instagram_url, facebook_url } = await request.json();
 
     const supabase = getServiceClient();
     const { data, error } = await supabase
@@ -57,13 +54,13 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
-      console.error('[site-settings][POST] supabase error:', error);
+      console.error('[site-settings][POST]', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ data });
   } catch (e: any) {
-    console.error('[site-settings][POST] fatal:', e);
+    console.error('[site-settings][POST] fatal', e);
     return NextResponse.json({ error: e?.message ?? 'Server error' }, { status: 500 });
   }
 }
