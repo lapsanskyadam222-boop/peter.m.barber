@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { FileDrop } from '@/components/FileDrop';
+import SiteSettingsForm from '@/components/SiteSettingsForm'; // ⬅️ PRIDANÉ
 
 type Theme =
   | { mode: 'light' }
@@ -110,6 +111,7 @@ export default function AdminPage() {
     <main className="max-w-xl mx-auto py-8 space-y-8">
       <h1 className="text-xl font-semibold">Admin editor</h1>
 
+      {/* Logo */}
       <section className="space-y-3">
         <h2 className="font-medium">Logo (PNG/JPG, ≤10MB)</h2>
         <FileDrop
@@ -126,6 +128,7 @@ export default function AdminPage() {
         )}
       </section>
 
+      {/* Carousel */}
       <section className="space-y-3">
         <h2 className="font-medium">Carousel obrázky (1–10 JPG, ≤10MB/ks)</h2>
         <FileDrop
@@ -159,6 +162,7 @@ export default function AdminPage() {
         )}
       </section>
 
+      {/* Vzhľad */}
       <section className="space-y-3">
         <h2 className="font-medium">Vzhľad</h2>
 
@@ -218,6 +222,7 @@ export default function AdminPage() {
         </div>
       </section>
 
+      {/* Text */}
       <section className="space-y-2">
         <h2 className="font-medium">Text</h2>
         <textarea
@@ -229,6 +234,7 @@ export default function AdminPage() {
         />
       </section>
 
+      {/* Uloženie obsahu */}
       <div className="space-y-2">
         <button
           onClick={submit}
@@ -241,6 +247,17 @@ export default function AdminPage() {
         {err && <p className="text-red-600 text-sm">{err}</p>}
         <p className="text-xs text-gray-500">Zmeny sa okamžite prejavia – homepage ich číta vždy „no-store“.</p>
       </div>
+
+      {/* --- NOVÁ SEKCIA: Kontaktné údaje (tel, e-mail, IG/FB) --- */}
+      <hr className="my-10" />
+      <section className="space-y-4">
+        <h2 className="font-medium text-lg">Kontaktné údaje (tel, e-mail, Instagram, Facebook)</h2>
+        <p className="text-sm opacity-70">
+          Údaje sa zobrazia v pätičke homepage. Pri uložení budeš vyzvaný zadať <code>ADMIN_PASSWORD</code>.
+        </p>
+        <SiteSettingsForm />
+      </section>
+      {/* --- /NOVÁ SEKCIA --- */}
     </main>
   );
 }
