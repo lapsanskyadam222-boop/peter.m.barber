@@ -9,7 +9,7 @@
     "init:empty": "tsx scripts/init-empty-content.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.0",
+    "@supabase/supabase-js": "^2.74.0",
     "@vercel/blob": "^0.24.1",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",

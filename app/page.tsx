@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Carousel from '@/components/Carousel';
 import { SiteContent } from '@/lib/types';
 import { getBaseUrlServer } from '@/lib/getBaseUrlServer';
+import FooterContact from '@/components/FooterContact'; // PRIDANÉ
 
 type Theme =
   | { mode: 'light' }
@@ -34,13 +35,16 @@ export default async function HomePage() {
 
   if (!result.ok) {
     return (
-      <main className="mx-auto max-w-2xl p-6">
-        <h1 className="mb-2 text-xl font-semibold">Načítanie obsahu zlyhalo</h1>
-        <pre className="whitespace-pre-wrap text-xs opacity-60">
-          {result.status ? `HTTP ${result.status}\n` : ''}
-          {result.error ?? ''}
-        </pre>
-      </main>
+      <>
+        <main className="mx-auto max-w-2xl p-6">
+          <h1 className="mb-2 text-xl font-semibold">Načítanie obsahu zlyhalo</h1>
+          <pre className="whitespace-pre-wrap text-xs opacity-60">
+            {result.status ? `HTTP ${result.status}\n` : ''}
+            {result.error ?? ''}
+          </pre>
+        </main>
+        <FooterContact />
+      </>
     );
   }
 
@@ -63,10 +67,8 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Tu globálne nastavíme CSS premenné pre celú stránku (html/body). */}
       <style>{`:root{--page-bg:${bg};--page-fg:${fg};}`}</style>
 
-      {/* Obsah – layout sa postará o rámik/centrovanie, farby už prídu z body */}
       <main className="min-h-dvh antialiased">
         <section className="flex flex-col items-center gap-4">
           {/* LOGO */}
@@ -89,7 +91,7 @@ export default async function HomePage() {
             </div>
           )}
 
-          {/* TEXT – zachová odseky, ak vkladáš plain text */}
+          {/* TEXT */}
           {text ? (
             <article
               className="prose text-center"
@@ -115,6 +117,8 @@ export default async function HomePage() {
           </div>
         </section>
       </main>
+
+      <FooterContact />
     </>
   );
 }
