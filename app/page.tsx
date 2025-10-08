@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Carousel from '@/components/Carousel';
 import { SiteContent } from '@/lib/types';
 import { getBaseUrlServer } from '@/lib/getBaseUrlServer';
-import FooterContact from '@/components/FooterContact'; // PRIDANÉ
+import FooterContact from '@/components/FooterContact';
 
 type Theme =
   | { mode: 'light' }
@@ -42,8 +42,11 @@ export default async function HomePage() {
             {result.status ? `HTTP ${result.status}\n` : ''}
             {result.error ?? ''}
           </pre>
+          {/* footer zobrazíme hneď pod chybovou hláškou s rovnakým odstupom */}
+          <div className="mt-8">
+            <FooterContact />
+          </div>
         </main>
-        <FooterContact />
       </>
     );
   }
@@ -54,7 +57,6 @@ export default async function HomePage() {
   const text = data.text ?? '';
   const theme = data.theme ?? { mode: 'light' as const };
 
-  // farby z témy
   let bg = '#ffffff';
   let fg = '#111111';
   if (theme.mode === 'dark') {
@@ -115,10 +117,13 @@ export default async function HomePage() {
               />
             </Link>
           </div>
+
+          {/* ⬇️ presunuté DOVNÚTRA main + rovnaký odstup ako nad CTA */}
+          <div className="mt-8 w-full">
+            <FooterContact />
+          </div>
         </section>
       </main>
-
-      <FooterContact />
     </>
   );
 }
