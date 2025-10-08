@@ -22,7 +22,8 @@ async function getContent(): Promise<{
     const base = getBaseUrlServer();
     const url = `${base}/api/content`;
     const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return { ok: false, status: res.status, error: `Fetch ${url} failed with ${res.status}` };
+    if (!res.ok)
+      return { ok: false, status: res.status, error: `Fetch ${url} failed with ${res.status}` };
     const json = (await res.json()) as SiteContent & { theme?: Theme; updatedAt?: string };
     return { ok: true, data: json };
   } catch (e: any) {
@@ -35,19 +36,16 @@ export default async function HomePage() {
 
   if (!result.ok) {
     return (
-      <>
-        <main className="mx-auto max-w-2xl p-6">
-          <h1 className="mb-2 text-xl font-semibold">Načítanie obsahu zlyhalo</h1>
-          <pre className="whitespace-pre-wrap text-xs opacity-60">
-            {result.status ? `HTTP ${result.status}\n` : ''}
-            {result.error ?? ''}
-          </pre>
-          {/* footer zobrazíme hneď pod chybovou hláškou s rovnakým odstupom */}
-          <div className="mt-8">
-            <FooterContact />
-          </div>
-        </main>
-      </>
+      <main className="mx-auto max-w-2xl p-6">
+        <h1 className="mb-2 text-xl font-semibold">Načítanie obsahu zlyhalo</h1>
+        <pre className="whitespace-pre-wrap text-xs opacity-60">
+          {result.status ? `HTTP ${result.status}\n` : ''}
+          {result.error ?? ''}
+        </pre>
+        <div className="mt-8">
+          <FooterContact />
+        </div>
+      </main>
     );
   }
 
@@ -57,6 +55,7 @@ export default async function HomePage() {
   const text = data.text ?? '';
   const theme = data.theme ?? { mode: 'light' as const };
 
+  // farby z témy
   let bg = '#ffffff';
   let fg = '#111111';
   if (theme.mode === 'dark') {
@@ -75,7 +74,6 @@ export default async function HomePage() {
         <section className="flex flex-col items-center gap-4">
           {/* LOGO */}
           {logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={logoUrl}
               alt="logo"
@@ -93,10 +91,10 @@ export default async function HomePage() {
             </div>
           )}
 
-          {/* TEXT */}
+          {/* TEXT – semibold cez vlastnú triedu */}
           {text ? (
             <article
-              className="prose text-center"
+              className="text-center admin-semi"
               style={{ maxWidth: 'min(92vw, 900px)', whiteSpace: 'pre-line' }}
             >
               {text}
@@ -107,8 +105,11 @@ export default async function HomePage() {
 
           {/* CTA */}
           <div className="mt-8 w-full flex justify-center">
-            <Link href="/rezervacia" aria-label="Rezervácie" className="inline-block active:translate-y-[1px] transition">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+            <Link
+              href="/rezervacia"
+              aria-label="Rezervácie"
+              className="inline-block active:translate-y-[1px] transition"
+            >
               <img
                 src="/cta/rezervaciebtn.svg?v=1"
                 alt="Rezervácie"
@@ -118,7 +119,7 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          {/* ⬇️ presunuté DOVNÚTRA main + rovnaký odstup ako nad CTA */}
+          {/* Footer kontakty – rovnaká medzera ako nad CTA */}
           <div className="mt-8 w-full">
             <FooterContact />
           </div>
