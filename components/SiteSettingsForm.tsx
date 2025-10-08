@@ -11,11 +11,12 @@ type Settings = {
 
 export default function SiteSettingsForm() {
   const [settings, setSettings] = useState<Settings>({});
+  const [adminPwd, setAdminPwd] = useState('');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/admin/site-settings')
+    fetch('/api/admin/site-settings', { cache: 'no-store' })
       .then((r) => r.json())
       .then((j) => j?.data && setSettings(j.data))
       .catch(() => {});
@@ -26,18 +27,22 @@ export default function SiteSettingsForm() {
     setLoading(true);
     setMsg(null);
 
-    const adminPassword = prompt('Zadaj admin heslo (ADMIN_PASSWORD) pre uloženie:') || '';
+    if (!adminPwd) {
+      setMsg('Zadaj admin heslo (ADMIN_PASSWORD).');
+      setLoading(false);
+      return;
+    }
 
     const res = await fetch('/api/admin/site-settings', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-admin-password': adminPassword,
+        'x-admin-password': adminPwd,
       },
       body: JSON.stringify(settings),
     });
 
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
     if (res.ok) setMsg('Nastavenia uložené.');
     else setMsg('Chyba: ' + (json?.error ?? 'unknown'));
 
@@ -47,7 +52,6 @@ export default function SiteSettingsForm() {
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: 16 }}>
       <h2>Kontaktné údaje webu</h2>
-
       <form onSubmit={save}>
         <label>
           Telefón (napr. +421901234567)
@@ -93,20 +97,26 @@ export default function SiteSettingsForm() {
           />
         </label>
 
+        <div style={{ marginTop: 12 }}>
+          <label>
+            Admin heslo (ADMIN_PASSWORD)
+            <input
+              type="password"
+              value={adminPwd}
+              onChange={(e) => setAdminPwd(e.target.value)}
+              placeholder="••••••••"
+              style={{ width: '100%', padding: 8, marginTop: 6, marginBottom: 12 }}
+            />
+          </label>
+        </div>
+
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="submit" disabled={loading}>
-            {loading ? 'Ukladám…' : 'Uložiť'}
+            {loading ? 'Ukladám…' : 'Uložiť kontakty'}
           </button>
           <button
             type="button"
-            onClick={() =>
-              setSettings({
-                phone: '',
-                email: '',
-                instagram_url: '',
-                facebook_url: '',
-              })
-            }
+            onClick={() => setSettings({ phone: '', email: '', instagram_url: '', facebook_url: '' })}
           >
             Vymazať
           </button>
