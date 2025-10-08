@@ -15,33 +15,35 @@ export default async function FooterContact() {
   const ig = data?.instagram_url?.trim() || '';
   const fb = data?.facebook_url?.trim() || '';
 
-  // spoločná trieda pre odkazy: farba z témy, bez podčiarknutia, hrubšie písmo
-  const linkCls =
-    'no-underline font-semibold text-[var(--page-fg)] visited:text-[var(--page-fg)] hover:opacity-80 focus:opacity-80 active:opacity-70';
+  // Štýl, ktorý prebije default modrú/purpurovú a podčiarknutie
+  const linkStyle: React.CSSProperties = {
+    color: 'var(--page-fg)',
+    textDecoration: 'none',
+    fontWeight: 600,
+  };
 
   return (
-    <footer className="py-6 text-center">
-      <div className="mb-2 space-x-3">
+    <footer className="py-6 text-center" style={{ color: 'var(--page-fg)' }}>
+      <div style={{ marginBottom: 8, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
         {phone && (
-          <a href={`tel:${phone}`} className={linkCls} aria-label={`Zavolať ${phone}`}>
+          <a href={`tel:${phone}`} style={linkStyle} aria-label={`Zavolať ${phone}`}>
             📞 {phone}
           </a>
         )}
         {email && (
-          <a href={`mailto:${email}`} className={linkCls} aria-label={`Napísať e-mail na ${email}`}>
+          <a href={`mailto:${email}`} style={linkStyle} aria-label={`Napísať e-mail na ${email}`}>
             ✉️ {email}
           </a>
         )}
       </div>
-
-      <div className="space-x-3">
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
         {ig && (
-          <a href={ig} target="_blank" rel="noopener noreferrer" className={linkCls}>
+          <a href={ig} target="_blank" rel="noopener noreferrer" style={linkStyle}>
             Instagram
           </a>
         )}
         {fb && (
-          <a href={fb} target="_blank" rel="noopener noreferrer" className={linkCls}>
+          <a href={fb} target="_blank" rel="noopener noreferrer" style={linkStyle}>
             Facebook
           </a>
         )}
