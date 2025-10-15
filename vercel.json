@@ -2,8 +2,8 @@
   "regions": ["fra1"],
   "crons": [
     {
-      "path": "/api/cron/blob-clean",
-      "schedule": "0 3 * * 0"
+      "path": "/api/cron/blob-clean?token=@cron_token",
+      "schedule": "0 7 * * *"
     }
   ]
 }
