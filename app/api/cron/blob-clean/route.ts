@@ -9,7 +9,6 @@ import { planCleanup } from '@/lib/blob-cleanup';
  * POST = manuálny trigger s možnosťou parametrov (napr. dryRun)
  */
 export async function GET(req: Request) {
-  // použijeme statický origin z env (napr. NEXT_PUBLIC_BASE_URL), aby fetch nezlyhal pri crone
   const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
   try {
     const report = await planCleanup({
