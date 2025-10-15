@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const origin = new URL(req.url).origin;
+  const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
   const now = new Date();
   const isSundayUTC = now.getUTCDay() === 0; // 0 = Sunday
 
